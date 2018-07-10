@@ -33,17 +33,51 @@
 
 #include "Magnum/Magnum.h"
 #include "Magnum/Math/Functions.h"
-#ifdef CORRADE_MSVC2015_COMPATIBILITY
-#include "Magnum/Animation/Animation.h" /* ResultOf alias on MSVC 2015 */
-#endif
+#include "Magnum/Animation/Animation.h"
 
 namespace Magnum { namespace Animation {
 
 namespace Implementation {
-    template<class T> struct TypeTraits {
-        typedef T ResultType;
+    template<class T, class R> struct TypeTraits {
+        typedef R ResultType;
+        typedef R(*Interpolator)(const T&, const T&, Float);
+
+        static Interpolator interpolator(Interpolation interpolation);
     };
 }
+
+/**
+@brief Animation interpolation
+
+Describes the general desired way to interpolate animation keyframes. The
+concrete choice of interpolator function is in user's hands.
+@see @ref interpolatorFor()
+@experimental
+*/
+enum class Interpolation: UnsignedByte {
+    /**
+     * Constant interpolation.
+     *
+     * @see @ref Math::select()
+     */
+    Constant,
+
+    /**
+     * Linear interpolation.
+     *
+     * @see @ref Math::lerp(), @ref Math::slerp(), @ref Math::sclerp()
+     */
+    Linear,
+
+    /**
+     * Custom interpolation. An user-supplied interpolation function should be
+     * used.
+     */
+    Custom
+};
+
+/** @debugoperatorenum{Interpolation} */
+MAGNUM_EXPORT Debug& operator<<(Debug& debug, Interpolation value);
 
 /**
 @brief Animation result type for given value type
@@ -56,6 +90,34 @@ does not result in a spline).
 #ifndef CORRADE_MSVC2015_COMPATIBILITY /* Multiple definitions still broken */
 template<class T> using ResultOf = typename Implementation::TypeTraits<T>::ResultType;
 #endif
+
+/**
+@brief Interpolator function for given type
+@tparam V           Value type
+@tparam R           Result type
+
+Expects that @p interpolation is not @ref Interpolation::Custom. Favors
+output correctness over performance, supply custom interpolator functions for
+faster but less precise results.
+
+@m_class{m-fullwidth}
+
+Interpolation type  | Value type        | Result type   | Interpolator
+------------------- | ----------------- | ------------- | ------------
+@ref Interpolation::Constant | any `V`  | `V`           | @ref Math::select()
+@ref Interpolation::Linear | @cpp bool @ce <b></b> | @cpp bool @ce <b></b> | @ref Math::select()
+@ref Interpolation::Linear | @ref Math::BoolVector | @ref Math::BoolVector | @ref Math::select()
+@ref Interpolation::Linear | any scalar `V` | `V`       | @ref Math::lerp()
+@ref Interpolation::Linear | any vector `V` | `V`       | @ref Math::lerp()
+@ref Interpolation::Linear | @ref Math::Quaternion | @ref Math::Quaternion | @ref Math::slerp(const Quaternion<T>&, const Quaternion<T>&, T) "Math::slerp()"
+@ref Interpolation::Linear | @ref Math::DualQuaternion | @ref Math::DualQuaternion | @ref Math::sclerp(const DualQuaternion<T>&, const DualQuaternion<T>&, T) "Math::sclerp()"
+
+@see @ref interpolate(), @ref interpolateStrict()
+@experimental
+*/
+template<class V, class R = ResultOf<V>> auto interpolatorFor(Interpolation interpolation) -> R(*)(const V&, const V&, Float) {
+    return Implementation::TypeTraits<V, R>::interpolator(interpolation);
+}
 
 /**
 @brief Animation extrapolation behavior
@@ -154,6 +216,56 @@ Used internally from @ref Track::atStrict() / @ref TrackView::atStrict(), see
 @experimental
 */
 template<class K, class V, class R = ResultOf<V>> R interpolateStrict(const Containers::StridedArrayView<const K>& keys, const Containers::StridedArrayView<const V>& values, R(*interpolator)(const V&, const V&, Float), K frame, std::size_t& hint);
+
+namespace Implementation {
+
+template<class T> struct TypeTraitsBool {
+    typedef T ResultType;
+    typedef T(*Interpolator)(const T&, const T&, Float);
+
+    static Interpolator interpolator(Interpolation interpolation);
+};
+
+template<> struct TypeTraits<bool, bool>: TypeTraitsBool<bool> {};
+template<std::size_t size> struct TypeTraits<Math::BoolVector<size>, Math::BoolVector<size>>: TypeTraitsBool<Math::BoolVector<size>> {};
+
+template<class T> struct MAGNUM_EXPORT TypeTraits<Math::Quaternion<T>, Math::Quaternion<T>> {
+    typedef Math::Quaternion<T> ResultType;
+    typedef Math::Quaternion<T>(*Interpolator)(const Math::Quaternion<T>&, const Math::Quaternion<T>&, Float);
+
+    static Interpolator interpolator(Interpolation interpolation);
+};
+
+template<class T> struct MAGNUM_EXPORT TypeTraits<Math::DualQuaternion<T>, Math::DualQuaternion<T>> {
+    typedef Math::DualQuaternion<T> ResultType;
+    typedef Math::DualQuaternion<T>(*Interpolator)(const Math::DualQuaternion<T>&, const Math::DualQuaternion<T>&, Float);
+
+    static Interpolator interpolator(Interpolation interpolation);
+};
+
+template<class V, class R> auto TypeTraits<V, R>::interpolator(Interpolation interpolation) -> Interpolator {
+    switch(interpolation) {
+        case Interpolation::Constant: return Math::select;
+        case Interpolation::Linear: return Math::lerp;
+
+        case Interpolation::Custom: ; /* nope */
+    }
+
+    CORRADE_ASSERT(false, "Animation::interpolatorFor(): can't deduce interpolator function for" << interpolation, {});
+}
+
+template<class T> auto TypeTraitsBool<T>::interpolator(Interpolation interpolation) -> Interpolator {
+    switch(interpolation) {
+        case Interpolation::Constant:
+        case Interpolation::Linear: return Math::select;
+
+        case Interpolation::Custom: ; /* nope */
+    }
+
+    CORRADE_ASSERT(false, "Animation::interpolatorFor(): can't deduce interpolator function for" << interpolation, {});
+}
+
+}
 
 template<class K, class V, class R> R interpolate(const Containers::StridedArrayView<const K>& keys, const Containers::StridedArrayView<const V>& values, const Extrapolation before, const Extrapolation after, R(*const interpolator)(const V&, const V&, Float), K frame, std::size_t& hint) {
     CORRADE_ASSERT(keys.size() == values.size(), "Animation::interpolate(): keys and values don't have the same size", {});
