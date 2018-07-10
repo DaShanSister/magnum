@@ -126,6 +126,15 @@ template<class K, class V, class R
         typedef ResultType(*Interpolator)(const ValueType&, const ValueType&, Float);
 
         /**
+         * @brief Construct an empty track
+         *
+         * The @ref data(), @ref keys(), @ref values() and @ref interpolator()
+         * functions return @cpp nullptr @ce, @ref at() always returns a
+         * default-constructed value.
+         */
+        explicit Track() noexcept: _data{}, _interpolator{}, _before{}, _after{} {}
+
+        /**
          * @brief Constructor
          * @param data          Keyframe data
          * @param interpolator  Interpolator function
@@ -258,6 +267,9 @@ template<class K, class V, class R
 Cast to @ref TrackView of correct type to use.
 */
 class TrackViewStorage {
+    public:
+        constexpr /*implicit*/ TrackViewStorage() noexcept: _keys{}, _values{}, _interpolator{}, _before{}, _after{} {}
+
     private:
         template<class, class, class> friend class TrackView;
 
@@ -296,6 +308,15 @@ template<class K, class V, class R
 
         /** @brief Interpolation function */
         typedef ResultType(*Interpolator)(const ValueType&, const ValueType&, Float);
+
+        /**
+         * @brief Construct an empty track
+         *
+         * The @ref keys(), @ref values() and @ref interpolator() functions
+         * return @cpp nullptr @ce, @ref at() always returns a
+         * default-constructed value.
+         */
+        explicit TrackView() noexcept {}
 
         /**
          * @brief Constructor
