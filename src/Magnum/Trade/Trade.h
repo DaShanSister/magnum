@@ -37,6 +37,12 @@ namespace Magnum { namespace Trade {
 class AbstractImageConverter;
 class AbstractImporter;
 class AbstractMaterialData;
+
+enum class AnimationTrackTarget: UnsignedByte;
+enum class AnimationTrackType: UnsignedByte;
+class AnimationTrackData;
+class AnimationData;
+
 class CameraData;
 
 template<UnsignedInt> class ImageData;
