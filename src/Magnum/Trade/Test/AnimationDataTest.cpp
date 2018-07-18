@@ -35,6 +35,7 @@ struct AnimationDataTest: TestSuite::Tester {
     explicit AnimationDataTest();
 
     void construct();
+    void constructTrackDataDefault();
 
     void trackCustomResultType();
 
@@ -48,6 +49,7 @@ struct AnimationDataTest: TestSuite::Tester {
 
 AnimationDataTest::AnimationDataTest() {
     addTests({&AnimationDataTest::construct,
+              &AnimationDataTest::constructTrackDataDefault,
 
               &AnimationDataTest::trackCustomResultType,
 
@@ -120,6 +122,11 @@ void AnimationDataTest::construct() {
         CORRADE_COMPARE(track.interpolation(), Animation::Interpolation::Linear);
         CORRADE_COMPARE(track.at(2.5f), Quaternion::rotation(32.5_degf, Vector3::yAxis()));
     }
+}
+
+void AnimationDataTest::constructTrackDataDefault() {
+    AnimationTrackData data;
+    CORRADE_VERIFY(true); /* no public accessors here, so nothing to check */
 }
 
 void AnimationDataTest::trackCustomResultType() {
